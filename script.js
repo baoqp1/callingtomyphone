@@ -450,131 +450,127 @@ $('back').onclick = () => {
 
 };
 
-
 /* =========================================================
    01 — SMILE
 ========================================================= */
 
 let smileCount = 0;
-
 let smileLocked = false;
+let smileFinished = false;
+let smileTimer = null;
 
+
+/* =========================================================
+   SMILE CHAPTER
+========================================================= */
 
 async function smile() {
 
     const my = run;
 
+    smileCount = 0;
+    smileLocked = false;
+    smileFinished = false;
 
-    $('smilegame')
-        .classList.remove('show');
+    if (smileTimer) {
+        clearTimeout(smileTimer);
+        smileTimer = null;
+    }
 
+    $('smilegame').classList.remove('show');
 
     $('smileseq').innerHTML = '';
-
     $('smileend').innerHTML = '';
 
-
-    $('smilecontinue').style.display =
-        'none';
-
+    $('smilecontinue').style.display = 'none';
 
     await sleep(600);
 
+    if (my !== run) return;
 
-    const ok =
-        await seq(
-            $('smileseq'),
+    const ok = await seq(
+        $('smileseq'),
+        [
             [
-                [
-                    'Có một điều tôi khá thích ở bà.',
-                    1500
-                ],
-
-                [
-                    'Là lúc bà cười.',
-                    1600
-                ],
-
-                [
-                    'Nên tôi có một thử thách nhỏ.',
-                    1500
-                ],
-
-                [
-                    'Bắt đủ 8 nụ cười nhé. 😉',
-                    1200,
-                    'hl'
-                ]
+                'Có một điều tôi khá thích ở bà.',
+                1500
             ],
-            my
-        );
 
+            [
+                'Là lúc bà cười.',
+                1600
+            ],
+
+            [
+                'Nên tôi có một thử thách nhỏ.',
+                1500
+            ],
+
+            [
+                'Bắt đủ 8 nụ cười nhé. 😉',
+                1200,
+                'hl'
+            ]
+        ],
+        my
+    );
 
     if (!ok) return;
 
-
     $('smileseq').innerHTML = '';
 
-
-    $('smilegame')
-        .classList.add('show');
-
+    $('smilegame').classList.add('show');
 
     startSmileGame(my);
-
 }
 
 
 /* =========================================================
-   SMILE GAME
+   START SMILE GAME
 ========================================================= */
 
 function startSmileGame(my) {
 
     smileCount = 0;
-
     smileLocked = false;
+    smileFinished = false;
 
+    if (smileTimer) {
+        clearTimeout(smileTimer);
+        smileTimer = null;
+    }
 
-    const area =
-        $('gamearea');
+    $('gamearea').innerHTML = '';
 
-
-    area.innerHTML = '';
-
-
-    $('smilescore').textContent =
-        '0 / 8';
-
+    $('smilescore').textContent = '0 / 8';
 
     spawnSmile(my);
-
 }
 
+
+/* =========================================================
+   SPAWN SMILE
+========================================================= */
 
 function spawnSmile(my) {
 
     if (
         my !== run ||
+        smileFinished ||
         smileCount >= 8
     ) {
         return;
     }
 
+    const area = $('gamearea');
 
-    const area =
-        $('gamearea');
-
-
-    const smile =
+    const target =
         document.createElement('div');
 
-
-    smile.className =
+    target.className =
         'smile-target';
 
-
-    smile.textContent =
+    target.textContent =
         '😊';
 
 
@@ -589,16 +585,14 @@ function spawnSmile(my) {
         );
 
 
-    smile.style.width =
+    target.style.width =
         size + 'px';
 
-
-    smile.style.height =
+    target.style.height =
         size + 'px';
 
-
-    smile.style.fontSize =
-        size * .55 + 'px';
+    target.style.fontSize =
+        size * 0.55 + 'px';
 
 
     const maxX =
@@ -607,7 +601,6 @@ function spawnSmile(my) {
             area.clientWidth - size
         );
 
-
     const maxY =
         Math.max(
             0,
@@ -615,16 +608,22 @@ function spawnSmile(my) {
         );
 
 
-    smile.style.left =
+    target.style.left =
         Math.random() * maxX + 'px';
 
-
-    smile.style.top =
+    target.style.top =
         Math.random() * maxY + 'px';
 
 
-    area.appendChild(smile);
+    area.appendChild(target);
 
+
+    let removed = false;
+
+
+    /* =====================================================
+       TARGET TIMEOUT
+    ===================================================== */
 
     const life =
         Math.max(
@@ -633,32 +632,45 @@ function spawnSmile(my) {
         );
 
 
-    let removed = false;
+    const timer =
+        setTimeout(() => {
+
+            if (
+                removed ||
+                smileFinished ||
+                my !== run
+            ) {
+                return;
+            }
 
 
-    const removeTarget = () => {
+            removed = true;
 
-        if (removed) return;
-
-
-        removed = true;
-
-        smile.remove();
+            target.remove();
 
 
-        if (my === run) {
-            spawnSmile(my);
-        }
+            if (
+                my === run &&
+                !smileFinished &&
+                smileCount < 8
+            ) {
+                spawnSmile(my);
+            }
 
-    };
+        }, life);
 
 
-    smile.onclick = () => {
+    /* =====================================================
+       CLICK
+    ===================================================== */
+
+    target.onclick = () => {
 
         if (
+            removed ||
             smileLocked ||
-            my !== run ||
-            removed
+            smileFinished ||
+            my !== run
         ) {
             return;
         }
@@ -667,7 +679,13 @@ function spawnSmile(my) {
         smileLocked = true;
 
 
-        smile.classList.add('hit');
+        clearTimeout(timer);
+
+
+        removed = true;
+
+
+        target.classList.add('hit');
 
 
         smileCount++;
@@ -679,13 +697,13 @@ function spawnSmile(my) {
 
         const x =
             parseFloat(
-                smile.style.left
+                target.style.left
             ) + size / 2;
 
 
         const y =
             parseFloat(
-                smile.style.top
+                target.style.top
             ) + size / 2;
 
 
@@ -701,48 +719,62 @@ function spawnSmile(my) {
         );
 
 
+        /* =================================================
+           ĐỦ 8
+        ================================================= */
+
+        if (smileCount >= 8) {
+
+            smileFinished = true;
+
+
+            target.remove();
+
+
+            if (smileTimer) {
+                clearTimeout(smileTimer);
+                smileTimer = null;
+            }
+
+
+            smileLocked = true;
+
+
+            finishSmileGame(my);
+
+
+            return;
+        }
+
+
+        /* =================================================
+           CHƯA ĐỦ 8
+        ================================================= */
+
         setTimeout(() => {
 
-            if (removed) {
-                smileLocked = false;
+            if (my !== run) {
                 return;
             }
 
 
-            removed = true;
+            target.remove();
 
-            smile.remove();
 
             smileLocked = false;
 
 
-            if (
-                smileCount >= 8
-            ) {
-
-                finishSmileGame(my);
-
-            } else {
-
-                spawnSmile(my);
-
-            }
+            spawnSmile(my);
 
         }, 420);
 
     };
 
-
-    setTimeout(
-        removeTarget,
-        life
-    );
-
 }
 
 
 /* =========================================================
-   SMILE PARTICLES
+   PARTICLES
 ========================================================= */
 
 function createSmileParticles(x, y) {
@@ -758,9 +790,7 @@ function createSmileParticles(x, y) {
     ) {
 
         const p =
-            document.createElement(
-                'span'
-            );
+            document.createElement('span');
 
 
         p.className =
@@ -781,17 +811,13 @@ function createSmileParticles(x, y) {
 
         p.style.setProperty(
             '--dx',
-            `${(
-                Math.random() * 80 - 40
-            )}px`
+            `${Math.random() * 80 - 40}px`
         );
 
 
         p.style.setProperty(
             '--dy',
-            `${(
-                Math.random() * 80 - 40
-            )}px`
+            `${Math.random() * 80 - 40}px`
         );
 
 
@@ -842,9 +868,7 @@ function createGlowRose(x, y) {
         '<use href="#rose"></use>';
 
 
-    area.appendChild(
-        rose
-    );
+    area.appendChild(rose);
 
 
     setTimeout(
@@ -856,16 +880,38 @@ function createGlowRose(x, y) {
 
 
 /* =========================================================
-   SMILE FINISH
+   FINISH SMILE GAME
 ========================================================= */
 
 async function finishSmileGame(my) {
 
+    if (
+        my !== run ||
+        !smileFinished
+    ) {
+        return;
+    }
+
+
+    smileLocked = true;
+
+
+    /* Xóa target còn sót */
+
+    $('gamearea')
+        .querySelectorAll('.smile-target')
+        .forEach(el => {
+            el.remove();
+        });
+
+
+    await sleep(700);
+
+
     if (my !== run) return;
 
 
-    await sleep(600);
-
+    /* Ẩn game */
 
     $('smilegame')
         .classList.remove('show');
@@ -875,6 +921,11 @@ async function finishSmileGame(my) {
 
 
     if (my !== run) return;
+
+
+    /* Hiện lời nhắn */
+
+    $('smileend').innerHTML = '';
 
 
     const ok =
@@ -914,13 +965,25 @@ async function finishSmileGame(my) {
     if (!ok) return;
 
 
+    /* Hiện Continue */
+
     $('smilecontinue').style.display =
         'block';
 
 }
 
 
+/* =========================================================
+   CONTINUE
+========================================================= */
+
 $('smilecontinue').onclick = () => {
+
+    $('smilecontinue')
+        .classList.remove('show');
+
+    $('smilecontinue').style.display =
+        'none';
 
     go('menu');
 
